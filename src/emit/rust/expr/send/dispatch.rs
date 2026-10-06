@@ -251,7 +251,7 @@ pub(super) fn dispatch_method_by_recv_ty(
                 // `as i64` cast — non-primary. Decide pass stamps
                 // `NEEDS_PARENS` on this Send for chained-recv use;
                 // consumer wraps. Arg/let-RHS positions stay bare.
-                Some(format!("{recv_s}.len() as i64"))
+                Some(format!("{recv_s}.chars().count() as i64"))
             }
             // `str.to_i` → Ruby semantics: parse leading digits, 0 on
             // parse failure / non-numeric input. Rust's `parse::<i64>`
@@ -313,6 +313,13 @@ pub(super) fn dispatch_method_by_recv_ty(
         // typed `&String` (Map iter keys) or a genuine
         // `&serde_json::Value` (Map iter values). Avoids the
         // false-positive E0599 from a Var-only narrowing rule.
+        // `Integer#to_i` is the identity. Its common receiver is an
+        // index read (`arr[i].to_i`), which types `Integer | nil` but
+        // renders as the `i64` itself (see the nil peel above).
+        Some(Ty::Int) => match method {
+            "to_i" if args.is_empty() => Some(recv_s.to_string()),
+            _ => None,
+        },
         Some(Ty::Untyped) | Some(Ty::Record { .. }) => match method {
             "to_s" if args.is_empty() => {
                 // `recv_s` is already wrap-aware via `emit_send_recv`
